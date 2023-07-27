@@ -1,0 +1,56 @@
+body {
+    background: #1F2530;;
+    color: #c9d1d9;
+}
+
+.chat-box, .form-select, .form-control, .form-select:focus, .form-control:focus {
+    background: #0d1117;
+    color: #c9d1d9;
+    border: none;
+}
+
+.chat-box {
+    height: 500px;
+    overflow: auto;
+}
+
+.you-section {
+    background: #161b22;
+}
+
+.you-section > pre {
+    text-wrap: unset;
+    font-size: 16px;
+    line-height: 1.5;
+    font-family: unset;
+}
+
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.select-wrapper:after {
+    content: '\25BE';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 1em;
+    background: transparent;
+    color: #c9d1d9;
+    pointer-events: none;
+    line-height: 38px;
+    transition: 0.25s all ease;
+}
+
+.select-wrapper select {
+    width: 100%;
+    padding-right: 1.5em;
+    background: #0d1117;
+    color: #c9d1d9;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}

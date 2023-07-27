@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}
+Chat
+{% endblock %}
+
+{% block content %}
+{% raw %}
+<div id="app" class="container py-3">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="select-wrapper mb-3 mb-md-0">
+                        <select class="form-select" v-model="selectedAgent">
+                            <option v-for="agent in options.agents" :value="agent">{{ agent.role }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="select-wrapper">
+                        <select class="form-select" v-model="selectedModel">
+                            <option v-for="model in options.models" :value="model">{{ model }}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-box rounded mb-3" ref="chatBox">
+                <div v-if="!loading && messages.length === 0" class="empty-chat-placeholder p-3 text-muted">
+                    <p>No messages yet. Start a conversation!</p>
+                </div>
+                <div v-for="message in messages">
+                    <div v-if="message.sender === 'You'" class="you-section p-3">
+                        <span class="text-success font-weight-bold">{{ message.sender }}</span>
+                        <pre>{{ message.content }}</pre>
+                    </div>
+                    <div v-else class="response-section p-3">
+                        <span class="text-primary font-weight-bold">{{ message.sender }}</span>
+                        <div class="markdown-body">
+                            <div v-html="markdownToHtml(message.content)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <textarea class="form-control" v-model="userMessage" placeholder="Type your message..." rows="3"></textarea>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <button class="btn btn-primary w-100 mb-3 mb-md-0" v-on:click="sendMessage()">Send</button>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-secondary w-100" v-on:click="clear()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { ref, onMounted, watch, nextTick } = Vue;
+    const markdownIt = window.markdownit();
+
+    const app = Vue.createApp({
+        setup() {
+            const selectedAgent = ref({});
+            const selectedModel = ref('');
+            const userMessage = ref('');
+            const messages = ref([]);
+            const options = ref({ agents: [], models: [] });
+            const chatBox = ref(null);
+            const loading = ref(true);
+
+            function markdownToHtml(markdownText) {
+                return markdownIt.render(markdownText);
+            }
+
+            function scrollToBottom() {
+                nextTick(() => {
+                    chatBox.value.scrollTop = chatBox.value.scrollHeight;
+                });
+            }
+
+            async function getOptions() {
+                const response = await fetch('/api/options');
+                options.value = await response.json();
+
+                const storedAgent = localStorage.getItem('selectedAgent');
+                const storedModel = localStorage.getItem('selectedModel');
+
+                selectedAgent.value = storedAgent ? JSON.parse(storedAgent) : options.value.agents[0];
+                selectedModel.value = storedModel ? storedModel : options.value.models[0];
+            }
+
+            async function getHistory() {
+                const response = await fetch('/api/history');
+                const history = await response.json();
+                messages.value = history;
+                scrollToBottom();
+            }
+
+            async function sendMessage() {
+                const message = {
+                    message: userMessage.value,
+                    agent: selectedAgent.value.role,
+                    model: selectedModel.value
+                };
+                messages.value.push({ sender: 'You', content: userMessage.value });
+                scrollToBottom();
+                userMessage.value = '';
+
+                const placeholderIndex = messages.value.length;
+                const placeholderMessage = { sender: selectedAgent.value.name, content: "." };
+                messages.value.push(placeholderMessage);
+                scrollToBottom();
+
+                let dotCount = 1;
+                const intervalId = setInterval(() => {
+                    dotCount = (dotCount % 3) + 1;
+                    const dots = Array(dotCount).fill('.').join(' ');
+                    placeholderMessage.content = dots;
+                    messages.value[placeholderIndex] = { ...placeholderMessage };
+                }, 500);
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(message)
+                });
+
+                if (!response.ok) {
+                    clearInterval(intervalId);
+                    scrollToBottom();
+                    loading.value = false;
+                    return messages.value[placeholderIndex].content = 'An error has occurred';
+                }
+
+                const data = await response.json();
+
+                clearInterval(intervalId);
+                messages.value[placeholderIndex] = { sender: data.agent, content: data.response };
+                scrollToBottom();
+                loading.value = false;
+            }
+
+            async function clear() {
+                await fetch('/api/clear', { method: 'POST' });
+                messages.value = [];
+            }
+
+            onMounted(async () => {
+                await getOptions();
+                await getHistory();
+                loading.value = false;
+            });
+
+            watch(selectedAgent, (newVal) => {
+                localStorage.setItem('selectedAgent', JSON.stringify(newVal));
+            });
+
+            watch(selectedModel, (newVal) => {
+                localStorage.setItem('selectedModel', newVal);
+            });
+
+            return { selectedAgent, selectedModel, userMessage, messages, options, sendMessage, markdownToHtml, clear, chatBox, loading }
+        }
+
+        
+    });
+    app.mount('#app');
+</script>
+{% endraw %}
+{% endblock %}
